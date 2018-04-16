@@ -1,0 +1,141 @@
+diff --git a/node_pane.module b/node_pane.module
+index 7acf354..7a23139 100755
+--- a/node_pane.module
++++ b/node_pane.module
+@@ -13,6 +13,10 @@ function node_pane_ctools_plugin_pre_alter(&$plugin, &$info) {
+   if ($plugin['plugin type'] == 'content_types' && $plugin['title'] == t('Existing node')) {
+     // Override the standard node plugin.
+     $plugin['single'] = FALSE;
++    if(module_exists('uuid')){
++      $plugin['defaults']['uuid'] = '';
++      $plugin['render callback'] = 'node_pane_node_content_type_render';
++    }
+   }
+ }
+ 
+@@ -63,6 +67,17 @@ function node_pane_form_ctools_node_content_type_edit_form_alter(&$form, &$form_
+     '#type' => 'value',
+     '#value' => $form_state['conf']['nid'],
+   );
++  if (module_exists('uuid')) {
++    if (!isset($form_state['conf']['uuid'])) {
++      $node = node_load($form_state['conf']['nid']);
++      $form_state['conf']['uuid'] = $node->uuid;
++    }
++    $form['uuid'] = array(
++      '#type' => 'value',
++      '#value' => $form_state['conf']['uuid'],
++    );
++    $form['#submit'][] = 'node_pane_form_node_content_uuid_submit';
++  }
+ }
+ 
+ /**
+@@ -101,6 +116,10 @@ function ctools_node_content_type_selection_form($form, &$form_state) {
+ 
+ function node_pane_content_type_selection_form_return_submit(&$form, &$form_state) {
+   $form_state['conf']['nid'] = $form_state['values']['selected_nid'];
++  if(module_exists('uuid')) {
++    $node = node_load($form_state['conf']['nid']);
++    $form_state['conf']['uuid'] = $node->uuid;
++  }
+ }
+ 
+ /**
+@@ -132,5 +151,96 @@ function node_pane_content_type_add_form_return_submit(&$form, &$form_state) {
+ 
+   node_form_submit($form, $form_state);
+   $form_state['conf']['nid'] = $form_state['values']['nid'];
++  if(module_exists('uuid')) {
++    $node = node_load($form_state['conf']['nid']);
++    $form_state['conf']['uuid'] = $node->uuid;
++  }
+ }
+ 
++function node_pane_form_node_content_uuid_submit(&$form, &$form_state){
++  $form_state['conf']['uuid'] = $form_state['values']['uuid'];
++}
++
++function node_pane_node_content_type_render($subtype, $conf, $panel_args) {
++  if (!isset($conf['uuid'])) {
++    ctools_include('node','ctools','plugins/content_types/node');
++    return ctools_node_content_type_render($subtype, $conf, $panel_args);
++  }
++  $uuid = $conf['uuid'];
++  $block = new stdClass();
++
++  foreach (explode('/', $_GET['q']) as $id => $arg) {
++    $uuid = str_replace("%$id", $arg, $uuid);
++  }
++
++  foreach ($panel_args as $id => $arg) {
++    if (is_string($arg)) {
++      $uuid = str_replace("@$id", $arg, $uuid);
++    }
++  }
++
++  $nodes = entity_uuid_load('node',array($uuid));
++  $node = reset($nodes);
++  if(!$node) {
++    return;
++  }
++
++  $nid = $node->nid;
++
++  // Support node translation
++  if (module_exists('translation')) {
++    if ($translations = module_invoke('translation', 'node_get_translations', $nid)) {
++      if (isset($translations[$GLOBALS['language']->language])) {
++        $nid = $translations[$GLOBALS['language']->language]->nid;
++      }
++    }
++  }
++
++  if (!node_access('view', $node)) {
++    return;
++  }
++
++  // Don't store viewed node data on the node, this can mess up other
++  // views of the node.
++  $node = clone($node);
++
++  $block->module = 'node';
++  $block->delta = $node->nid;
++
++  // Set block->title to the plain node title, then additionally set block->title_link to
++  // the node url if required. The actual link is rendered in ctools_content_render().
++  $block->title = check_plain($node->title);
++  if (!empty($conf['link_node_title'])) {
++    $block->title_link = 'node/' . $node->nid;
++  }
++
++  if (empty($conf['leave_node_title'])) {
++    $node->title = NULL;
++  }
++
++  if (!empty($conf['identifier'])) {
++    $node->ctools_template_identifier = $conf['identifier'];
++  }
++
++  // Handle existing configurations with the deprecated 'teaser' option.
++  if (isset($conf['teaser'])) {
++    $conf['build_mode'] = $conf['teaser'] ? 'teaser' : 'full';
++  }
++
++  $block->content = node_view($node, $conf['build_mode']);
++
++  // Hide links if they've been suppressed.
++  if (empty($conf['links'])) {
++    $block->content['links']['#access'] = FALSE;
++  }
++
++  return $block;
++}
++
++// Preprocess this layout.
++function node_pane_panels_pane_prerender($pane) {
++  if($pane->type == 'node') {
++      $node = node_load($pane->configuration['nid']);
++      $pane->configuration['uuid'] = $node->uuid;
++  }
++}
