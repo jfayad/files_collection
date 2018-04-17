@@ -1,0 +1,42 @@
+diff --git a/commerce_giftwrap.module b/commerce_giftwrap.module
+index 0ee4bbf..5929f00 100644
+--- a/commerce_giftwrap.module
++++ b/commerce_giftwrap.module
+@@ -136,7 +136,7 @@ function commerce_giftwrap_delete_giftwrap_line_items($order) {
+   $line_item_id = NULL;
+   foreach ($order_wrapper->commerce_line_items as $delta => $line_item_wrapper) {
+     // If this line item is a giftwrap line item...
+-    if ($line_item_wrapper->type->value() == 'giftwrap') {
++    if ($line_item_wrapper->getBundle() == 'giftwrap') {
+       // Store its ID for later deletion and remove the reference from the line
+       // item reference field.
+       $line_item_id = $line_item_wrapper->line_item_id->value();
+@@ -166,8 +166,9 @@ function commerce_giftwrap_line_item_exists($order) {
+   $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+   foreach ($order_wrapper->commerce_line_items as $line_item_wrapper) {
+     // If this line item is a giftwrap line item...
+-    if ($line_item_wrapper->type->value() == 'giftwrap') {
++    if ($line_item_wrapper->getBundle() == 'giftwrap') {
+       return TRUE;
++      
+     }
+   }
+ }
+@@ -185,7 +186,7 @@ function commerce_giftwrap_get_line_item_id($order) {
+   $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+   foreach ($order_wrapper->commerce_line_items as $line_item_wrapper) {
+     // If this line item is a giftwrap line item...
+-    if ($line_item_wrapper->type->value() == 'giftwrap') {
++    if ($line_item_wrapper->getBundle() == 'giftwrap') {
+       return $line_item_wrapper->line_item_id->value();
+     }
+   }
+@@ -205,7 +206,7 @@ function commerce_giftwrap_get_message($order) {
+   $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+   foreach ($order_wrapper->commerce_line_items as $line_item) {
+     // If this line item is a giftwrap line item...
+-    if ($line_item->type->value() == 'giftwrap') {
++    if ($line_item->getBundle() == 'giftwrap') {
+       $message = $line_item->commerce_giftwrap_message->value();
+       break;
+     }
